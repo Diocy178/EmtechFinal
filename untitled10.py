@@ -1,74 +1,78 @@
-import os
-import tensorflow
-import numpy as np
 import streamlit as st
+import numpy as np
 from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-import shutil
+from tensorflow.keras.preprocessing import image
+import os
 
-def predict_image(img_path, model, class_labels, threshold=0.6):
+# Function to load the Keras model
+def load_keras_model(model_path):
     try:
-        img = load_img(img_path, target_size=(128, 128))
-        img_array = img_to_array(img)
+        model = load_model(model_path)
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        return None
+
+# Function to predict the class of an image
+def predict_image(img_path, model, class_labels, threshold=0.5):
+    try:
+        img = image.load_img(img_path, target_size=(128, 128))
+        img_array = image.img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
         img_array = img_array / 255.0
         predictions = model.predict(img_array)
         class_index = np.argmax(predictions)
-        class_label = class_labels[class_index]
         confidence = predictions[0][class_index]
+        
         if confidence < threshold:
-            class_label = "Unknown"
-        return class_label, confidence
+            return "Unknown Weather", confidence
+        else:
+            return class_labels[class_index], confidence
     except Exception as e:
         st.error(f"Error predicting image: {e}")
         return None, None
 
-def main():
-    st.title("Image Classification App")
+# Streamlit app
+st.title("Weather Image Classification")
 
-    model_path = 'finals_model (1).h5'
-    if not os.path.exists(model_path):
-        st.error(f"No file or directory found at {model_path}")
-        return
+# Load the model
+model_path = 'finals_model (1).h5'
+model = load_keras_model(model_path)
 
-    model = load_model(model_path)
-    class_labels = ['Rain', 'Sunrise', 'Cloudy', 'Shine']
+if model is not None:
+    # Define the class labels
+    class_labels = ['Rain', 'Sunrise', 'Cloudy', 'Shine', 'Unknown']
 
-    uploaded_file = st.file_uploader("Choose an image...", type="jpg")
+    # Upload an image
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png"])
+
     if uploaded_file is not None:
-        img_path = os.path.join("temp", uploaded_file.name)
+        # Save the uploaded image
+        img_path = os.path.join("uploaded_image.jpg")
         with open(img_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
-
-        label, confidence = predict_image(img_path, model, class_labels)
-
+        
+        # Display the uploaded image
+        st.image(img_path, caption='Uploaded Image', use_column_width=True)
+        st.write("")
+        st.write("Classifying...")
+        
+        # Predict the class of the image
+        label, confidence = predict_image(img_path, model, class_labels, threshold=0.8)
+        
         if label is not None and confidence is not None:
+            # Display the prediction
             st.write(f"Prediction: {label}")
             st.write(f"Confidence: {confidence:.2f}")
 
-            # Save the image to the corresponding folder
-            if label != "Unknown":
-                destination_folder = os.path.join("data", label)
-                os.makedirs(destination_folder, exist_ok=True)
-                shutil.move(img_path, os.path.join(destination_folder, os.path.basename(img_path)))
-                st.write(f"Image moved to {label} folder.")
-            else:
-                unknown_folder = os.path.join("data", "Unknown")
-                os.makedirs(unknown_folder, exist_ok=True)
-                shutil.move(img_path, os.path.join(unknown_folder, os.path.basename(img_path)))
-                st.write("Image classified as Unknown and moved to Unknown folder.")
-
-            # Display the current working directory
-            current_directory = os.getcwd()
-            st.write(f"Current Directory: {current_directory}")
-
-            # Display the directory where the images are moved
-            moved_directory = os.path.abspath(os.path.join(current_directory, "data"))
-            st.write(f"Images moved to: {moved_directory}")
-
-if __name__ == "__main__":
-    # Create temp directory for uploads
-    if not os.path.exists("temp"):
-        os.makedirs("temp")
-
-    main()
+# Add gradient background related to weather
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background: linear-gradient(135deg, #72edf2 10%, #5151e5 100%);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
