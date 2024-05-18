@@ -4,7 +4,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 
 # Load the trained model
-model_path = 'finals_model.h5'
+model_path = 'finals_model (1).h5'
 model = load_model(model_path)
 
 # Define the class labels
