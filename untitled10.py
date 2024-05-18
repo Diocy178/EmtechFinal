@@ -1,95 +1,73 @@
-import streamlit as st
+import os
 import numpy as np
+import streamlit as st
 from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+import shutil
 
-# Load the trained model
-model = load_model('finals_model (1).h5')
+def predict_image(img_path, model, class_labels, threshold=0.6):
+    try:
+        img = load_img(img_path, target_size=(128, 128))
+        img_array = img_to_array(img)
+        img_array = np.expand_dims(img_array, axis=0)
+        img_array = img_array / 255.0
+        predictions = model.predict(img_array)
+        class_index = np.argmax(predictions)
+        class_label = class_labels[class_index]
+        confidence = predictions[0][class_index]
+        if confidence < threshold:
+            class_label = "Unknown"
+        return class_label, confidence
+    except Exception as e:
+        st.error(f"Error predicting image: {e}")
+        return None, None
 
-# Define the class labels
-class_labels = ['Rain', 'Shine', 'Cloudy', 'Sunrise']
+def main():
+    st.title("Image Classification App")
 
-# Function to predict the class of an image
-def predict_image(img_path, model):
-    img = image.load_img(img_path, target_size=(128, 128))
-    img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = img_array / 255.0
-    predictions = model.predict(img_array, verbose=0)  # Added verbose=0 for cleaner output
-    predicted_class = class_labels[np.argmax(predictions)]
-    confidence = np.max(predictions)
-    return predicted_class, confidence
+    model_path = 'finals_model (1).h5'
+    if not os.path.exists(model_path):
+        st.error(f"No file or directory found at {model_path}")
+        return
 
-# Apply weather-themed gradient background color and text color using CSS
-st.markdown(
-    """
-    <style>
-    .main {
-        background: linear-gradient(to bottom right, #00c6ff, #0072ff);
-        color: black;
-    }
-    h1, .stMarkdown, .stFileUploader {
-        color: black;
-    }
-    </style>
+    model = load_model(model_path)
+    class_labels = ['Rain', 'Sunrise', 'Cloudy', 'Shine']
 
-    <style>
-    .sidebar .sidebar-content .st-ec {
-        color: white;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+    uploaded_file = st.file_uploader("Choose an image...", type="jpg")
+    if uploaded_file is not None:
+        img_path = os.path.join("temp", uploaded_file.name)
+        with open(img_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
 
-# Set the title in the sidebar
-st.sidebar.title("Emtech Final-Project")
-with st.sidebar:
-    st.subheader("Developer")
-    st.write('<p style="color:white;">James Solomon Diocena</p>', unsafe_allow_html=True)
-    st.write('<p style="color:white;">Mark John Villanueva</p>', unsafe_allow_html=True)
+        label, confidence = predict_image(img_path, model, class_labels)
 
+        if label is not None and confidence is not None:
+            st.write(f"Prediction: {label}")
+            st.write(f"Confidence: {confidence:.2f}")
 
-st.title("Weather Image Classification")
-st.write("Upload an image to classify the weather condition.")
+            # Save the image to the corresponding folder
+            if label != "Unknown":
+                destination_folder = os.path.join("data", label)
+                os.makedirs(destination_folder, exist_ok=True)
+                shutil.move(img_path, os.path.join(destination_folder, os.path.basename(img_path)))
+                st.write(f"Image moved to {label} folder.")
+            else:
+                unknown_folder = os.path.join("data", "Unknown")
+                os.makedirs(unknown_folder, exist_ok=True)
+                shutil.move(img_path, os.path.join(unknown_folder, os.path.basename(img_path)))
+                st.write("Image classified as Unknown and moved to Unknown folder.")
 
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png"])
+            # Display the current working directory
+            current_directory = os.getcwd()
+            st.write(f"Current Directory: {current_directory}")
 
-if uploaded_file is not None:
-    # Save the uploaded file
-    with open("uploaded_image.jpg", "wb") as f:
-        f.write(uploaded_file.getbuffer())
+            # Display the directory where the images are moved
+            moved_directory = os.path.abspath(os.path.join(current_directory, "data"))
+            st.write(f"Images moved to: {moved_directory}")
 
-    st.image(uploaded_file, caption='Uploaded Image', use_column_width=True)
-    st.write("")
-    st.write("Classify As")
+if __name__ == "__main__":
+    # Create temp directory for uploads
+    if not os.path.exists("temp"):
+        os.makedirs("temp")
 
-    # Add a spinner while the model is making a prediction
-    with st.spinner('Model is working...'):
-        label, confidence = predict_image("uploaded_image.jpg", model)
-    
-    st.write(f"Prediction: {label}")
-    st.write(f"Confidence: {confidence:.2f}")
-
-# Add JavaScript to automatically show sidebar when cursor moves to upper left corner
-st.markdown(
-    """
-    <script>
-        document.addEventListener("DOMContentLoaded", function(event) { 
-            const sidebar = document.querySelector(".sidebar");
-            const main = document.querySelector(".main");
-
-            document.addEventListener("mousemove", function(event) {
-                if (event.clientX < 10 && event.clientY < 10) {
-                    sidebar.style.display = "block";
-                    main.style.marginLeft = "250px";  // Adjust this value based on your sidebar width
-                } else {
-                    sidebar.style.display = "none";
-                    main.style.marginLeft = "0";
-                }
-            });
-        });
-    </script>
-    """,
-    unsafe_allow_html=True
-)
+    main()
