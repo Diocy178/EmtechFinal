@@ -41,7 +41,7 @@ model = load_keras_model(model_path)
 
 if model is not None:
     # Define the class labels
-    class_labels = ['Rain', 'Sunrise', 'Cloudy', 'Shine', 'Unknown']
+    class_labels = ['Rain', 'Shine', 'Cloudy', 'Sunrise', 'Unknown']
 
     # Upload an image
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png"])
